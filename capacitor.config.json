@@ -1,5 +1,5 @@
 {
   "appId": "com.planner.app",
   "appName": "PlannerApp",
-  "webDir": "."
+  "webDir": "www"
 }

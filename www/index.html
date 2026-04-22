@@ -1,0 +1,896 @@
+<meta name='viewport' content='width=device-width, initial-scale=1'/><!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Daily Planner</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #080c10;
+    --surface: #0d1117;
+    --surface2: #131a23;
+    --surface3: #1a2333;
+    --border: #1e2d3d;
+    --blue: #1e7fff;
+    --blue-dim: #0f4a99;
+    --blue-glow: rgba(30,127,255,0.15);
+    --text: #e0eaf8;
+    --text-dim: #6b86a1;
+    --text-muted: #3a4f66;
+    --green: #22d3a0;
+    --amber: #f5a623;
+    --red: #ff4f6a;
+    --purple: #9b6bff;
+    --mono: 'DM Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); overflow-x: hidden; }
+  #root { height: 100%; }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: var(--surface); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── TOPBAR ── */
+  .topbar {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(8,12,16,0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    padding: 0 16px; min-height: 56px;
+    flex-wrap: wrap; /* prevents overflow on narrow screens */
+    row-gap: 6px; padding-top: 6px; padding-bottom: 6px;
+  }
+  .topbar-logo {
+    font-weight: 800; font-size: 15px; letter-spacing: 0.08em;
+    color: var(--blue); text-transform: uppercase; white-space: nowrap; flex-shrink: 0;
+  }
+  .topbar-sep { width: 1px; height: 24px; background: var(--border); flex-shrink: 0; }
+
+  .date-nav { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .icon-btn {
+    background: none; border: 1px solid var(--border); color: var(--text-dim);
+    width: 28px; height: 28px; border-radius: 6px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 14px;
+    transition: border-color 0.15s, color 0.15s, background 0.15s; flex-shrink: 0;
+  }
+  .icon-btn:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-glow); }
+  .date-label {
+    font-family: var(--mono); font-size: 12px; color: var(--text);
+    padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--surface2); white-space: nowrap; user-select: none;
+  }
+  .today-btn {
+    background: none; border: 1px solid var(--border); color: var(--text-dim);
+    font-family: var(--mono); font-size: 11px; padding: 4px 8px; border-radius: 5px;
+    cursor: pointer; transition: all 0.15s; white-space: nowrap; flex-shrink: 0;
+  }
+  .today-btn:hover { border-color: var(--blue); color: var(--blue); }
+  .spacer { flex: 1; min-width: 8px; }
+  .view-toggle {
+    display: flex; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 7px; overflow: hidden; flex-shrink: 0;
+  }
+  .view-btn {
+    background: none; border: none; color: var(--text-dim);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em;
+    padding: 5px 10px; cursor: pointer; transition: all 0.15s;
+  }
+  .view-btn.active { background: var(--blue); color: #fff; }
+  .view-btn:not(.active):hover { color: var(--blue); }
+
+  .notif-btn {
+    background: none; border: 1px solid var(--border); color: var(--text-dim);
+    font-size: 14px; width: 30px; height: 30px; border-radius: 6px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s; flex-shrink: 0;
+  }
+  .notif-btn:hover { border-color: var(--blue); color: var(--blue); }
+  .notif-btn.active { border-color: var(--blue); color: var(--blue); background: var(--blue-glow); }
+
+  /* notification panel -- fixed so it never gets clipped */
+  .notif-panel {
+    position: fixed; top: 62px; right: 16px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px; width: 270px;
+    z-index: 300; box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+    animation: slideUp 0.15s ease;
+  }
+  .notif-panel-title { font-size: 11px; font-weight: 700; color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 14px; }
+  .notif-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .notif-label { font-size: 13px; color: var(--text); }
+  .toggle {
+    width: 36px; height: 20px; border-radius: 10px; cursor: pointer;
+    background: var(--surface3); border: 1px solid var(--border);
+    position: relative; transition: background 0.2s, border-color 0.2s; flex-shrink: 0; outline: none;
+  }
+  .toggle::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 14px; height: 14px; border-radius: 50%; background: var(--text-muted);
+    transition: transform 0.2s, background 0.2s;
+  }
+  .toggle.on { background: var(--blue); border-color: var(--blue); }
+  .toggle.on::after { transform: translateX(16px); background: #fff; }
+  .notif-note { font-family: var(--mono); font-size: 11px; color: var(--text-muted); margin-top: 8px; line-height: 1.5; }
+  .notif-note.error { color: var(--red); }
+
+  /* ── LAYOUT ── */
+  .app-body { max-width: 1200px; margin: 0 auto; padding: 20px 16px 60px; }
+
+  .daily-grid { display: grid; grid-template-columns: 1fr 340px; gap: 16px; align-items: start; }
+  @media(max-width: 768px) { .daily-grid { grid-template-columns: 1fr; } }
+
+  /* ── SECTION CARD ── */
+  .section-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--surface2);
+  }
+  .section-title { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); }
+  .add-btn {
+    background: var(--blue); border: none; color: #fff;
+    font-family: var(--mono); font-size: 11px; padding: 5px 10px;
+    border-radius: 5px; cursor: pointer; transition: opacity 0.15s;
+  }
+  .add-btn:hover { opacity: 0.85; }
+
+  /* ── LISTS ── */
+  .task-list { padding: 10px; display: flex; flex-direction: column; gap: 6px; min-height: 80px; }
+  .empty-state { text-align: center; padding: 28px 16px; color: var(--text-muted); font-family: var(--mono); font-size: 12px; }
+
+  .task-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 12px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface2);
+    transition: border-color 0.15s;
+  }
+  .task-item:hover { border-color: var(--blue-dim); }
+  .task-item.done { opacity: 0.42; }
+  .task-check {
+    width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--text-muted);
+    flex-shrink: 0; margin-top: 2px; cursor: pointer; transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center; font-size: 10px;
+  }
+  .task-check.checked { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .task-body { flex: 1; min-width: 0; }
+  .task-title { font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.3; }
+  .task-item.done .task-title { text-decoration: line-through; }
+  .task-meta { font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+  .task-notes { font-size: 11px; color: var(--text-muted); margin-top: 4px; font-style: italic; white-space: pre-wrap; }
+  .task-actions { display: flex; gap: 4px; flex-shrink: 0; align-items: flex-start; }
+  .tiny-btn {
+    background: none; border: none; color: var(--text-muted); font-size: 13px;
+    width: 22px; height: 22px; border-radius: 4px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+  }
+  .tiny-btn:hover { background: var(--surface3); color: var(--text); }
+  .tiny-btn.del:hover { color: var(--red); }
+
+  /* ── MEAL COLORS ── */
+  .meal-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 6px; }
+  .meal-dot.breakfast { background: var(--amber); }
+  .meal-dot.lunch     { background: var(--green); }
+  .meal-dot.dinner    { background: var(--purple); }
+  .meal-dot.snack     { background: var(--blue); }
+  .meal-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 12px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface2); transition: border-color 0.15s;
+  }
+  .meal-item:hover { border-color: var(--blue-dim); }
+  .meal-item.done { opacity: 0.42; }
+  .meal-body { flex: 1; min-width: 0; }
+  .meal-type { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+  .meal-type.breakfast { color: var(--amber); }
+  .meal-type.lunch     { color: var(--green); }
+  .meal-type.dinner    { color: var(--purple); }
+  .meal-type.snack     { color: var(--blue); }
+  .meal-desc { font-size: 13px; color: var(--text); margin-top: 2px; white-space: pre-wrap; }
+  .meal-time-label { font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+
+  /* ── WEEKLY ── */
+  .week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+  @media(max-width: 900px) { .week-grid { grid-template-columns: repeat(4, 1fr); } }
+  @media(max-width: 520px)  { .week-grid { grid-template-columns: repeat(2, 1fr); } }
+  .week-day-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden; transition: border-color 0.15s; cursor: pointer;
+  }
+  .week-day-card:hover { border-color: var(--blue-dim); }
+  .week-day-card.today-card { border-color: var(--blue); }
+  .week-day-header {
+    padding: 10px 12px; background: var(--surface2); border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .week-dow { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); }
+  .week-dom { font-family: var(--mono); font-size: 20px; font-weight: 500; color: var(--text); }
+  .today-card .week-dom { color: var(--blue); }
+  .week-counts { padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; min-height: 56px; }
+  .count-chip { font-family: var(--mono); font-size: 11px; color: var(--text-dim); display: flex; align-items: center; gap: 5px; }
+  .count-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--blue); flex-shrink: 0; }
+  .count-dot.meal { background: var(--green); }
+
+  /* ── MONTHLY ── */
+  .month-header-row { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 4px; }
+  .month-dow { font-family: var(--mono); font-size: 10px; color: var(--text-muted); text-align: center; padding: 4px 0; text-transform: uppercase; letter-spacing: 0.08em; }
+  .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+  .month-cell {
+    aspect-ratio: 1 / 1; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 5px; cursor: pointer; transition: border-color 0.15s;
+    display: flex; flex-direction: column; min-height: 44px;
+  }
+  .month-cell:hover { border-color: var(--blue-dim); }
+  .month-cell.today-cell { border-color: var(--blue); }
+  .month-cell.other-month { opacity: 0.22; pointer-events: none; }
+  .month-cell.selected-cell { background: var(--blue-glow); border-color: var(--blue); }
+  .month-date { font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-bottom: 3px; }
+  .today-cell .month-date { color: var(--blue); font-weight: 700; }
+  .month-dots { display: flex; flex-wrap: wrap; gap: 2px; }
+  .m-dot { width: 5px; height: 5px; border-radius: 50%; }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(4,8,14,0.88);
+    backdrop-filter: blur(6px); z-index: 200;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+    animation: fadeIn 0.15s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; width: 100%; max-width: 460px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.85); animation: slideUp 0.18s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .modal-header {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .modal-title { font-size: 14px; font-weight: 700; color: var(--text); }
+  .modal-close { background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer; line-height: 1; transition: color 0.15s; }
+  .modal-close:hover { color: var(--text); }
+  .modal-body { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+
+  .field label { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 5px; }
+  .field input, .field textarea, .field select {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 7px; color: var(--text); font-family: var(--mono);
+    font-size: 13px; padding: 9px 12px; transition: border-color 0.15s; outline: none; -webkit-appearance: none;
+  }
+  .field input:focus, .field textarea:focus, .field select:focus { border-color: var(--blue); }
+  .field textarea { resize: vertical; min-height: 68px; }
+  .field select option { background: #131a23; }
+  .field input[type="date"]::-webkit-calendar-picker-indicator,
+  .field input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: pointer; }
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .field-err { color: var(--red); font-family: var(--mono); font-size: 12px; }
+
+  .btn { border: none; border-radius: 7px; font-family: var(--mono); font-size: 12px; padding: 8px 16px; cursor: pointer; transition: opacity 0.15s; }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-ghost { background: var(--surface2); color: var(--text-dim); border: 1px solid var(--border); }
+  .btn-ghost:hover { color: var(--text); border-color: var(--text-muted); }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-danger:hover { opacity: 0.85; }
+
+  /* ── CONFIRM ── */
+  .confirm-box {
+    background: var(--surface); border: 1px solid var(--red);
+    border-radius: 10px; padding: 20px; width: 100%; max-width: 320px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.85); animation: slideUp 0.15s ease;
+  }
+  .confirm-msg { font-size: 13px; color: var(--text); margin-bottom: 16px; line-height: 1.6; }
+  .confirm-row { display: flex; gap: 8px; justify-content: flex-end; }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--surface3); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--mono); font-size: 12px;
+    padding: 10px 20px; border-radius: 8px; z-index: 999;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.6); white-space: nowrap; pointer-events: none;
+    animation: toastIn 0.2s ease;
+  }
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script>
+'use strict';
+const { useState, useRef, useCallback } = React;
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+// BUG FIX: use local-time formatter instead of toISOString() which converts to UTC
+// and causes dates to shift by 1 day for timezones west of UTC.
+function fmtDate(d) {
+  const y  = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const dy = String(d.getDate()).padStart(2, '0');
+  return y + '-' + mo + '-' + dy;
+}
+function todayStr() { return fmtDate(new Date()); }
+
+// BUG FIX: parse YYYY-MM-DD in local time (new Date(str) parses as UTC midnight)
+function parseDate(s) {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+const DOW    = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MONTHS = ['January','February','March','April','May','June',
+                'July','August','September','October','November','December'];
+const MEAL_TYPES = ['Breakfast','Lunch','Dinner','Snack'];
+
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+// BUG FIX: useStorage uses a functional updater internally so it never captures
+// stale state (the old version's useCallback with [key] dep could close over
+// an old array and silently drop concurrent edits).
+function useStorage(key, def) {
+  const [val, setVal] = useState(() => {
+    try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : def; }
+    catch { return def; }
+  });
+  const set = useCallback(updater => {
+    setVal(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      try { localStorage.setItem(key, JSON.stringify(next)); } catch(e) {}
+      return next;
+    });
+  }, [key]);
+  return [val, set];
+}
+
+// ─── TOAST ────────────────────────────────────────────────────────────────────
+function Toast({ msg }) {
+  if (!msg) return null;
+  return React.createElement('div', { className: 'toast' }, msg);
+}
+
+// ─── CONFIRM ─────────────────────────────────────────────────────────────────
+function Confirm({ message, onConfirm, onCancel }) {
+  // BUG FIX: use data attribute for overlay detection instead of className string comparison
+  const overlayClick = e => { if (e.target.dataset.overlay) onCancel(); };
+  return React.createElement('div', { className: 'modal-overlay', 'data-overlay': '1', onClick: overlayClick },
+    React.createElement('div', { className: 'confirm-box' },
+      React.createElement('div', { className: 'confirm-msg' }, message),
+      React.createElement('div', { className: 'confirm-row' },
+        React.createElement('button', { className: 'btn btn-ghost', onClick: onCancel }, 'Cancel'),
+        React.createElement('button', { className: 'btn btn-danger', onClick: onConfirm }, 'Delete')
+      )
+    )
+  );
+}
+
+// ─── TASK MODAL ───────────────────────────────────────────────────────────────
+function TaskModal({ initial, onSave, onClose, dateDefault }) {
+  // BUG FIX: spread-copy initial so we never mutate the live task object in state
+  const [t, setT] = useState(() =>
+    initial ? { ...initial }
+            : { title: '', date: dateDefault || todayStr(), startTime: '09:00', endTime: '10:00', notes: '', done: false }
+  );
+  const [err, setErr] = useState('');
+  const set = k => e => setT(p => ({ ...p, [k]: e.target.value }));
+
+  const save = () => {
+    if (!t.title.trim())           { setErr('Title is required.'); return; }
+    if (t.startTime >= t.endTime)  { setErr('End time must be after start time.'); return; }
+    onSave({ ...t, title: t.title.trim() });
+  };
+
+  const overlayClick = e => { if (e.target.dataset.overlay) onClose(); };
+
+  return React.createElement('div', { className: 'modal-overlay', 'data-overlay': '1', onClick: overlayClick },
+    React.createElement('div', { className: 'modal' },
+      React.createElement('div', { className: 'modal-header' },
+        React.createElement('span', { className: 'modal-title' }, initial ? 'Edit Task' : 'New Task'),
+        React.createElement('button', { className: 'modal-close', onClick: onClose }, '×')
+      ),
+      React.createElement('div', { className: 'modal-body' },
+        React.createElement('div', { className: 'field' },
+          React.createElement('label', null, 'Title'),
+          React.createElement('input', {
+            value: t.title, onChange: set('title'),
+            placeholder: 'Task title…', autoFocus: true,
+            onKeyDown: e => e.key === 'Enter' && save()
+          })
+        ),
+        React.createElement('div', { className: 'field' },
+          React.createElement('label', null, 'Date'),
+          React.createElement('input', { type: 'date', value: t.date, onChange: set('date') })
+        ),
+        React.createElement('div', { className: 'row-2' },
+          React.createElement('div', { className: 'field' },
+            React.createElement('label', null, 'Start Time'),
+            React.createElement('input', { type: 'time', value: t.startTime, onChange: set('startTime') })
+          ),
+          React.createElement('div', { className: 'field' },
+            React.createElement('label', null, 'End Time'),
+            React.createElement('input', { type: 'time', value: t.endTime, onChange: set('endTime') })
+          )
+        ),
+        React.createElement('div', { className: 'field' },
+          React.createElement('label', null, 'Notes (optional)'),
+          React.createElement('textarea', { value: t.notes, onChange: set('notes'), placeholder: 'Any notes…' })
+        ),
+        err ? React.createElement('div', { className: 'field-err' }, err) : null
+      ),
+      React.createElement('div', { className: 'modal-footer' },
+        React.createElement('button', { className: 'btn btn-ghost', onClick: onClose }, 'Cancel'),
+        React.createElement('button', { className: 'btn btn-primary', onClick: save }, 'Save')
+      )
+    )
+  );
+}
+
+// ─── MEAL MODAL ───────────────────────────────────────────────────────────────
+function MealModal({ initial, onSave, onClose, dateDefault }) {
+  const [m, setM] = useState(() =>
+    initial ? { ...initial }
+            : { type: 'Breakfast', time: '08:00', desc: '', date: dateDefault || todayStr(), done: false }
+  );
+  const [err, setErr] = useState('');
+  const set = k => e => setM(p => ({ ...p, [k]: e.target.value }));
+
+  const save = () => {
+    if (!m.desc.trim()) { setErr('Please describe what you ate.'); return; }
+    onSave({ ...m, desc: m.desc.trim() });
+  };
+
+  const overlayClick = e => { if (e.target.dataset.overlay) onClose(); };
+
+  return React.createElement('div', { className: 'modal-overlay', 'data-overlay': '1', onClick: overlayClick },
+    React.createElement('div', { className: 'modal' },
+      React.createElement('div', { className: 'modal-header' },
+        React.createElement('span', { className: 'modal-title' }, initial ? 'Edit Meal' : 'Log Meal'),
+        React.createElement('button', { className: 'modal-close', onClick: onClose }, '×')
+      ),
+      React.createElement('div', { className: 'modal-body' },
+        React.createElement('div', { className: 'field' },
+          React.createElement('label', null, 'Meal Type'),
+          React.createElement('select', { value: m.type, onChange: set('type') },
+            MEAL_TYPES.map(mt => React.createElement('option', { key: mt, value: mt }, mt))
+          )
+        ),
+        React.createElement('div', { className: 'row-2' },
+          React.createElement('div', { className: 'field' },
+            React.createElement('label', null, 'Time'),
+            React.createElement('input', { type: 'time', value: m.time, onChange: set('time') })
+          ),
+          React.createElement('div', { className: 'field' },
+            React.createElement('label', null, 'Date'),
+            React.createElement('input', { type: 'date', value: m.date, onChange: set('date') })
+          )
+        ),
+        React.createElement('div', { className: 'field' },
+          React.createElement('label', null, 'Food Description'),
+          React.createElement('textarea', { value: m.desc, onChange: set('desc'), placeholder: 'What did you eat…', autoFocus: true })
+        ),
+        err ? React.createElement('div', { className: 'field-err' }, err) : null
+      ),
+      React.createElement('div', { className: 'modal-footer' },
+        React.createElement('button', { className: 'btn btn-ghost', onClick: onClose }, 'Cancel'),
+        React.createElement('button', { className: 'btn btn-primary', onClick: save }, 'Save')
+      )
+    )
+  );
+}
+
+// ─── TASK ITEM ────────────────────────────────────────────────────────────────
+function TaskItem({ task, onEdit, onDelete, onToggle }) {
+  return React.createElement('div', { className: 'task-item' + (task.done ? ' done' : '') },
+    React.createElement('div', {
+      className: 'task-check' + (task.done ? ' checked' : ''),
+      onClick: () => onToggle(task.id),
+      title: task.done ? 'Mark incomplete' : 'Mark complete'
+    }, task.done ? '✓' : ''),
+    React.createElement('div', { className: 'task-body' },
+      React.createElement('div', { className: 'task-title' }, task.title),
+      React.createElement('div', { className: 'task-meta' }, task.startTime + ' → ' + task.endTime),
+      task.notes ? React.createElement('div', { className: 'task-notes' }, task.notes) : null
+    ),
+    React.createElement('div', { className: 'task-actions' },
+      React.createElement('button', { className: 'tiny-btn', onClick: () => onEdit(task), title: 'Edit' }, '✎'),
+      React.createElement('button', { className: 'tiny-btn del', onClick: () => onDelete(task.id), title: 'Delete' }, '✕')
+    )
+  );
+}
+
+// ─── MEAL ITEM ────────────────────────────────────────────────────────────────
+function MealItem({ meal, onEdit, onDelete, onToggle }) {
+  const cls = meal.type.toLowerCase();
+  return React.createElement('div', { className: 'meal-item' + (meal.done ? ' done' : '') },
+    React.createElement('div', { className: 'meal-dot ' + cls }),
+    React.createElement('div', { className: 'meal-body' },
+      React.createElement('div', { className: 'meal-type ' + cls }, meal.type),
+      React.createElement('div', { className: 'meal-desc' }, meal.desc),
+      React.createElement('div', { className: 'meal-time-label' }, meal.time)
+    ),
+    React.createElement('div', { className: 'task-actions' },
+      React.createElement('div', {
+        className: 'task-check' + (meal.done ? ' checked' : ''),
+        style: { marginTop: '2px' },
+        onClick: () => onToggle(meal.id),
+        title: meal.done ? 'Mark incomplete' : 'Mark complete'
+      }, meal.done ? '✓' : ''),
+      React.createElement('button', { className: 'tiny-btn', onClick: () => onEdit(meal), title: 'Edit' }, '✎'),
+      React.createElement('button', { className: 'tiny-btn del', onClick: () => onDelete(meal.id), title: 'Delete' }, '✕')
+    )
+  );
+}
+
+// ─── NOTIFICATION PANEL ───────────────────────────────────────────────────────
+function NotifPanel({ onClose }) {
+  const [prefs, setPrefs] = useStorage('notif_prefs', { daily: false, weekly: false });
+  // BUG FIX: read permission state reactively so UI stays in sync
+  const [perm, setPerm] = useState(() =>
+    (typeof Notification !== 'undefined') ? Notification.permission : 'unsupported'
+  );
+
+  const toggle = async key => {
+    if (perm === 'unsupported') { alert('Your browser does not support notifications.'); return; }
+    if (perm === 'denied') {
+      alert('Notifications are blocked. Please allow them in your browser/OS settings and reload the page.');
+      return;
+    }
+    if (perm !== 'granted') {
+      const result = await Notification.requestPermission();
+      setPerm(result);
+      if (result !== 'granted') return;
+    }
+    setPrefs(p => ({ ...p, [key]: !p[key] }));
+  };
+
+  const testNotif = () => {
+    if (prefs.daily)  new Notification('📅 Plan your day',  { body: 'Good morning! Schedule your tasks for today.' });
+    if (prefs.weekly) new Notification('🗓 Plan your week', { body: 'Take a moment to organise your upcoming week.' });
+  };
+
+  return React.createElement('div', { className: 'notif-panel' },
+    React.createElement('div', { className: 'notif-panel-title' }, '🔔 Reminders'),
+    React.createElement('div', { className: 'notif-row' },
+      React.createElement('span', { className: 'notif-label' }, 'Daily reminder'),
+      React.createElement('button', { className: 'toggle' + (prefs.daily ? ' on' : ''), onClick: () => toggle('daily') })
+    ),
+    React.createElement('div', { className: 'notif-row' },
+      React.createElement('span', { className: 'notif-label' }, 'Weekly reminder'),
+      React.createElement('button', { className: 'toggle' + (prefs.weekly ? ' on' : ''), onClick: () => toggle('weekly') })
+    ),
+    perm === 'denied'
+      ? React.createElement('div', { className: 'notif-note error' }, '⚠ Notifications are blocked in your browser settings.')
+      : React.createElement('div', { className: 'notif-note' }, 'Toggling will prompt for browser permission the first time.'),
+    (perm === 'granted' && (prefs.daily || prefs.weekly))
+      ? React.createElement('button', {
+          className: 'btn btn-ghost',
+          style: { width: '100%', marginTop: '10px', fontSize: '11px' },
+          onClick: testNotif
+        }, 'Send test notification')
+      : null,
+    React.createElement('button', {
+      className: 'btn btn-ghost',
+      style: { width: '100%', marginTop: '8px', fontSize: '11px' },
+      onClick: onClose
+    }, 'Close')
+  );
+}
+
+// ─── DAILY VIEW ───────────────────────────────────────────────────────────────
+function DailyView({ date, tasks, meals, onAddTask, onAddMeal, onEditTask, onEditMeal, onDeleteTask, onDeleteMeal, onToggleTask, onToggleMeal }) {
+  const dayTasks = tasks.filter(t => t.date === date).sort((a,b) => a.startTime.localeCompare(b.startTime));
+  const dayMeals = meals.filter(m => m.date === date).sort((a,b) => a.time.localeCompare(b.time));
+  return React.createElement('div', { className: 'daily-grid' },
+    React.createElement('div', { className: 'section-card' },
+      React.createElement('div', { className: 'section-header' },
+        React.createElement('span', { className: 'section-title' }, '📋 Schedule'),
+        React.createElement('button', { className: 'add-btn', onClick: onAddTask }, '+ Task')
+      ),
+      React.createElement('div', { className: 'task-list' },
+        dayTasks.length === 0
+          ? React.createElement('div', { className: 'empty-state' }, 'No tasks yet -- add one above.')
+          : dayTasks.map(t => React.createElement(TaskItem, {
+              key: t.id, task: t,
+              onEdit: onEditTask, onDelete: onDeleteTask, onToggle: onToggleTask
+            }))
+      )
+    ),
+    React.createElement('div', { className: 'section-card' },
+      React.createElement('div', { className: 'section-header' },
+        React.createElement('span', { className: 'section-title' }, '🥗 Diet'),
+        React.createElement('button', { className: 'add-btn', onClick: onAddMeal }, '+ Meal')
+      ),
+      React.createElement('div', { className: 'task-list' },
+        dayMeals.length === 0
+          ? React.createElement('div', { className: 'empty-state' }, 'No meals logged yet.')
+          : dayMeals.map(m => React.createElement(MealItem, {
+              key: m.id, meal: m,
+              onEdit: onEditMeal, onDelete: onDeleteMeal, onToggle: onToggleMeal
+            }))
+      )
+    )
+  );
+}
+
+// ─── WEEKLY VIEW ──────────────────────────────────────────────────────────────
+function WeeklyView({ date, tasks, meals, onDayClick }) {
+  const d = parseDate(date);
+  const weekStart = new Date(d);
+  weekStart.setDate(d.getDate() - d.getDay());
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const x = new Date(weekStart);
+    x.setDate(weekStart.getDate() + i);
+    return fmtDate(x);
+  });
+  const td = todayStr();
+  return React.createElement('div', { className: 'week-grid' },
+    days.map(day => {
+      const dt = parseDate(day);
+      const taskCount = tasks.filter(t => t.date === day).length;
+      const mealCount = meals.filter(m => m.date === day).length;
+      const doneT = tasks.filter(t => t.date === day && t.done).length;
+      const doneM = meals.filter(m => m.date === day && m.done).length;
+      return React.createElement('div', {
+        key: day,
+        className: 'week-day-card' + (day === td ? ' today-card' : ''),
+        onClick: () => onDayClick(day)
+      },
+        React.createElement('div', { className: 'week-day-header' },
+          React.createElement('span', { className: 'week-dow' }, DOW[dt.getDay()]),
+          React.createElement('span', { className: 'week-dom' }, dt.getDate())
+        ),
+        React.createElement('div', { className: 'week-counts' },
+          taskCount > 0
+            ? React.createElement('div', { className: 'count-chip' },
+                React.createElement('div', { className: 'count-dot' }),
+                doneT + '/' + taskCount + ' task' + (taskCount !== 1 ? 's' : ''))
+            : null,
+          mealCount > 0
+            ? React.createElement('div', { className: 'count-chip' },
+                React.createElement('div', { className: 'count-dot meal' }),
+                doneM + '/' + mealCount + ' meal' + (mealCount !== 1 ? 's' : ''))
+            : null,
+          taskCount === 0 && mealCount === 0
+            ? React.createElement('div', { style: { color: 'var(--text-muted)', fontSize: '11px', fontFamily: 'var(--mono)' } }, 'empty')
+            : null
+        )
+      );
+    })
+  );
+}
+
+// ─── MONTHLY VIEW ─────────────────────────────────────────────────────────────
+function MonthlyView({ date, tasks, meals, onDayClick }) {
+  const d = parseDate(date);
+  const year = d.getFullYear(), month = d.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDay  = new Date(year, month + 1, 0);
+  const startPad = firstDay.getDay();
+  // BUG FIX: compute total cells to always fill complete weeks,
+  // handles the case where the last day is a Saturday (endPad was 0, causing issues)
+  const totalCells = Math.ceil((startPad + lastDay.getDate()) / 7) * 7;
+  const td = todayStr();
+
+  const cells = [];
+  for (let i = 0; i < totalCells; i++) {
+    const cellDate = new Date(year, month, 1 - startPad + i);
+    cells.push({ date: fmtDate(cellDate), other: cellDate.getMonth() !== month });
+  }
+
+  return React.createElement('div', null,
+    React.createElement('div', { className: 'month-header-row' },
+      DOW.map(dw => React.createElement('div', { key: dw, className: 'month-dow' }, dw))
+    ),
+    React.createElement('div', { className: 'month-grid' },
+      cells.map(({ date: day, other }) => {
+        const taskDots = tasks.filter(t => t.date === day).slice(0, 3);
+        const mealDots = meals.filter(m => m.date === day).slice(0, 2);
+        const cls = [
+          'month-cell',
+          other          ? 'other-month'   : '',
+          day === td     ? 'today-cell'    : '',
+          day === date && !other ? 'selected-cell' : ''
+        ].filter(Boolean).join(' ');
+        return React.createElement('div', {
+          key: day, className: cls,
+          onClick: () => !other && onDayClick(day)
+        },
+          React.createElement('div', { className: 'month-date' }, parseDate(day).getDate()),
+          React.createElement('div', { className: 'month-dots' },
+            taskDots.map(t => React.createElement('div', { key: t.id, className: 'm-dot', style: { background: 'var(--blue)' } })),
+            mealDots.map(m => React.createElement('div', { key: m.id, className: 'm-dot', style: { background: 'var(--green)' } }))
+          )
+        );
+      })
+    )
+  );
+}
+
+// ─── APP ──────────────────────────────────────────────────────────────────────
+function App() {
+  const [view,  setView]  = useStorage('pref_view', 'daily');
+  const [date,  setDate]  = useStorage('pref_date', todayStr());
+  const [tasks, setTasks] = useStorage('tasks', []);
+  const [meals, setMeals] = useStorage('meals', []);
+
+  const [taskModal,  setTaskModal]  = useState(null); // null | 'new' | taskObject
+  const [mealModal,  setMealModal]  = useState(null); // null | 'new' | mealObject
+  const [confirmDel, setConfirmDel] = useState(null); // null | { type, id }
+  const [showNotif,  setShowNotif]  = useState(false);
+  const [toast,      setToast]      = useState('');
+  const toastTimer = useRef(null);
+
+  const showToast = msg => {
+    setToast(msg);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(''), 2400);
+  };
+
+  // ── Navigation ──
+  const navigate = delta => {
+    const d = parseDate(date);
+    if      (view === 'daily')  d.setDate(d.getDate() + delta);
+    else if (view === 'weekly') d.setDate(d.getDate() + delta * 7);
+    else                        d.setMonth(d.getMonth() + delta);
+    setDate(fmtDate(d));
+  };
+
+  const dateLabel = () => {
+    const d = parseDate(date);
+    if (view === 'daily') {
+      return DOW[d.getDay()] + ', ' + MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+    }
+    if (view === 'weekly') {
+      const ws = new Date(d); ws.setDate(d.getDate() - d.getDay());
+      const we = new Date(ws); we.setDate(ws.getDate() + 6);
+      return MONTHS[ws.getMonth()].slice(0,3) + ' ' + ws.getDate() +
+             ' – ' + MONTHS[we.getMonth()].slice(0,3) + ' ' + we.getDate() +
+             ', ' + we.getFullYear();
+    }
+    return MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+  };
+
+  // ── Tasks ──
+  const saveTask = task => {
+    if (task.id) {
+      setTasks(prev => prev.map(t => t.id === task.id ? task : t));
+      showToast('Task updated ✓');
+    } else {
+      setTasks(prev => [...prev, { ...task, id: genId() }]);
+      showToast('Task added ✓');
+    }
+    setTaskModal(null);
+  };
+  const toggleTask   = id => setTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
+  const requestDelTask = id => setConfirmDel({ type: 'task', id });
+
+  // ── Meals ──
+  const saveMeal = meal => {
+    if (meal.id) {
+      setMeals(prev => prev.map(m => m.id === meal.id ? meal : m));
+      showToast('Meal updated ✓');
+    } else {
+      setMeals(prev => [...prev, { ...meal, id: genId() }]);
+      showToast('Meal logged ✓');
+    }
+    setMealModal(null);
+  };
+  const toggleMeal   = id => setMeals(prev => prev.map(m => m.id === id ? { ...m, done: !m.done } : m));
+  const requestDelMeal = id => setConfirmDel({ type: 'meal', id });
+
+  // ── Confirm delete ──
+  const execDelete = () => {
+    if (!confirmDel) return;
+    if (confirmDel.type === 'task') {
+      setTasks(prev => prev.filter(t => t.id !== confirmDel.id));
+      showToast('Task deleted');
+    } else {
+      setMeals(prev => prev.filter(m => m.id !== confirmDel.id));
+      showToast('Meal removed');
+    }
+    setConfirmDel(null);
+  };
+
+  const handleDayClick = day => { setDate(day); setView('daily'); };
+
+  // BUG FIX: derive notifActive from live React state (not a one-time localStorage read)
+  // so the bell icon updates immediately when toggles change.
+  const [notifPrefs] = useStorage('notif_prefs', { daily: false, weekly: false });
+  const notifActive = notifPrefs.daily || notifPrefs.weekly;
+
+  return React.createElement('div', null,
+
+    // ── TOPBAR ──
+    React.createElement('div', { className: 'topbar' },
+      React.createElement('div', { className: 'topbar-logo' }, '◈ Planner'),
+      React.createElement('div', { className: 'topbar-sep' }),
+      React.createElement('div', { className: 'date-nav' },
+        React.createElement('button', { className: 'icon-btn', onClick: () => navigate(-1), title: 'Previous' }, '‹'),
+        React.createElement('div',   { className: 'date-label' }, dateLabel()),
+        React.createElement('button', { className: 'icon-btn', onClick: () => navigate(1),  title: 'Next'     }, '›')
+      ),
+      React.createElement('button', { className: 'today-btn', onClick: () => setDate(todayStr()) }, 'Today'),
+      React.createElement('div', { className: 'spacer' }),
+      React.createElement('div', { className: 'view-toggle' },
+        ['daily', 'weekly', 'monthly'].map(v =>
+          React.createElement('button', {
+            key: v,
+            className: 'view-btn' + (view === v ? ' active' : ''),
+            onClick: () => setView(v)
+          }, v.charAt(0).toUpperCase() + v.slice(1))
+        )
+      ),
+      // BUG FIX: notif panel moved outside topbar flow and set to position:fixed
+      // so it is never clipped by the topbar's overflow or stacking context.
+      React.createElement('button', {
+        className: 'notif-btn' + (notifActive ? ' active' : ''),
+        onClick: () => setShowNotif(s => !s),
+        title: 'Reminders'
+      }, '🔔')
+    ),
+
+    // ── NOTIF PANEL (fixed, not inside topbar) ──
+    showNotif && React.createElement(NotifPanel, { onClose: () => setShowNotif(false) }),
+
+    // ── BODY ──
+    React.createElement('div', { className: 'app-body' },
+      view === 'daily' && React.createElement(DailyView, {
+        date, tasks, meals,
+        onAddTask:    () => setTaskModal('new'),
+        onAddMeal:    () => setMealModal('new'),
+        onEditTask:   t  => setTaskModal(t),
+        onEditMeal:   m  => setMealModal(m),
+        onDeleteTask: requestDelTask,
+        onDeleteMeal: requestDelMeal,
+        onToggleTask: toggleTask,
+        onToggleMeal: toggleMeal
+      }),
+      view === 'weekly' && React.createElement(WeeklyView, {
+        date, tasks, meals, onDayClick: handleDayClick
+      }),
+      view === 'monthly' && React.createElement(MonthlyView, {
+        date, tasks, meals, onDayClick: handleDayClick
+      })
+    ),
+
+    // ── MODALS ──
+    taskModal ? React.createElement(TaskModal, {
+      initial:     taskModal === 'new' ? null : taskModal,
+      dateDefault: date,
+      onSave:      saveTask,
+      onClose:     () => setTaskModal(null)
+    }) : null,
+
+    mealModal ? React.createElement(MealModal, {
+      initial:     mealModal === 'new' ? null : mealModal,
+      dateDefault: date,
+      onSave:      saveMeal,
+      onClose:     () => setMealModal(null)
+    }) : null,
+
+    // ── CONFIRM DELETE ──
+    confirmDel ? React.createElement(Confirm, {
+      message:   'Delete this ' + confirmDel.type + '? This cannot be undone.',
+      onConfirm: execDelete,
+      onCancel:  () => setConfirmDel(null)
+    }) : null,
+
+    React.createElement(Toast, { msg: toast })
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>
